@@ -8,16 +8,22 @@ No SaaS. No account. No vendor lock-in. Traces stay on disk in your repo or CI a
 
 ## Quickstart
 
+Try the full loop locally in four commands:
+
 ```bash
-npm install
-npm run build
-node dist/cli/index.js init
+npm ci && npm run build
 npm run example
-TRACE=$(ls .agentrec/runs/*.json | tail -1)
-node dist/cli/index.js show "$TRACE"
-node dist/cli/index.js report "$TRACE"
-node dist/cli/index.js replay "$TRACE"
-node dist/cli/index.js diff "$TRACE" "$TRACE"
+TRACE=$(ls -t .agentrec/runs/*.json | head -1)
+npx agentrec show "$TRACE" && npx agentrec report "$TRACE"
+```
+
+You just recorded an agent run, inspected its timeline, and generated a self-contained HTML report next to the trace.
+
+Useful follow-ups:
+
+```bash
+npx agentrec replay "$TRACE"
+npx agentrec diff "$TRACE" "$TRACE"
 ```
 
 The report command writes `<trace-file-basename>.html` next to the trace by default. Use `--output report.html` to choose a path.
