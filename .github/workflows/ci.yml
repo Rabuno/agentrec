@@ -1,21 +1,99 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Node ${{ matrix.node-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node-version: [20, 22]
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: node dist/cli/index.js --help
-      - run: npm run example
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build package
+        run: npm run build
+
+      - name: CLI smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node dist/cli/index.js --help
+          node dist/cli/index.js init
+          cat > /tmp/agentrec-smoke.trace.json <<'JSON'
+          {
+            "schemaVersion": "agentrec.trace.v1",
+            "runId": "ci-smoke",
+            "status": "completed",
+            "startedAt": "2026-01-01T00:00:00.000Z",
+            "finishedAt": "2026-01-01T00:00:01.000Z",
+            "durationMs": 1000,
+            "metadata": { "source": "ci" },
+            "events": [
+              {
+                "id": "evt_1",
+                "type": "run.started",
+                "timestamp": "2026-01-01T00:00:00.000Z",
+                "name": "run",
+                "data": { "input": "hello" }
+              },
+              {
+                "id": "evt_2",
+                "type": "run.finished",
+                "timestamp": "2026-01-01T00:00:01.000Z",
+                "name": "run",
+                "data": { "output": "done" }
+              }
+            ]
+          }
+          JSON
+          node dist/cli/index.js show /tmp/agentrec-smoke.trace.json
+          node dist/cli/index.js replay /tmp/agentrec-smoke.trace.json
+          node dist/cli/index.js report /tmp/agentrec-smoke.trace.json --output /tmp/agentrec-smoke.html
+          test -s /tmp/agentrec-smoke.html
+
+      - name: Example smoke test
+        run: npm run example
+
+      - name: Package install smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination /tmp
+          mkdir -p /tmp/agentrec-package-smoke
+          cd /tmp/agentrec-package-smoke
+          npm init -y >/dev/null
+          npm install /tmp/agentrec-*.tgz >/dev/null
+          npx agentrec --help
