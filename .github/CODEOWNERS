@@ -1,0 +1,10 @@
+# Repository ownership
+# Keep this small while agentrec is early-stage. Expand by area as contributors join.
+
+* @Rabuno
+
+# Trace format and report generation are compatibility-sensitive.
+/src/report.ts @Rabuno
+/src/core/ @Rabuno
+/docs/ @Rabuno
+/examples/ @Rabuno

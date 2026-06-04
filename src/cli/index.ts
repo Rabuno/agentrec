@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { mkdir, writeFile } from 'node:fs/promises';
 import { execa } from 'execa';
 import pc from 'picocolors';

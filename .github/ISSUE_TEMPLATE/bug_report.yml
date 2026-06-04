@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in agentrec
+title: "bug: "
+labels: [bug, needs reproduction]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please use a minimal synthetic trace when possible. Do not paste secrets or private production traces.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include commands, minimal trace data, or a small repo link.
+      render: bash
+    validations:
+      required: true
+  - type: input
+    id: agentrec-version
+    attributes:
+      label: agentrec version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "20.x / 22.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
