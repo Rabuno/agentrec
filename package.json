@@ -29,7 +29,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "commander": "^14.0.2",
+    "commander": "^15.0.0",
     "execa": "^9.6.0",
     "picocolors": "^1.1.1",
     "zod": "^4.1.13"
