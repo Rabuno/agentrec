@@ -1,17 +1,21 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { execa } from 'execa';
 import pc from 'picocolors';
 import { Command } from 'commander';
-import { readTrace, latestTracePath } from '../core/storage.js';
+import { readTrace, latestTracePath, DEFAULT_RUN_DIR } from '../core/storage.js';
 import { diffTraces } from '../diff.js';
 import { writeTraceReport } from '../report.js';
 const program=new Command();
 function timeline(t:any){ const lines=[`${pc.bold('Run')} ${t.runId}`,`Status: ${t.status}`,`Duration: ${t.durationMs??0}ms`,`Events: ${t.events.length}`]; if(t.metadata) lines.push(`Metadata: ${JSON.stringify(t.metadata)}`); lines.push('',pc.bold('Timeline')); for(const e of t.events) lines.push(`- ${e.timestamp} ${pc.yellow(e.type)} ${e.name??''}`); if(t.output!==undefined) lines.push('',`${pc.bold('Output')}: ${JSON.stringify(t.output)}`); return lines.join('\n'); }
+function fmtDuration(ms:number|undefined):string{ if(ms===undefined) return 'n/a'; return ms<1000?`${ms}ms`:`${(ms/1000).toFixed(1)}s`; }
+function fmtStatus(status:string):string{ return status==='completed'?pc.green(status):status==='failed'?pc.red(status):pc.yellow(status); }
 program.name('agentrec').description('Black box recorder for AI agents').version('0.1.0');
 program.command('init').description('Create .agentrec folders').action(async()=>{ await mkdir('.agentrec/runs',{recursive:true}); await mkdir('.agentrec/baselines',{recursive:true}); await writeFile('.agentrec/config.json',JSON.stringify({schemaVersion:1,runDir:'.agentrec/runs'},null,2)+'\n'); console.log('Initialized .agentrec/'); });
 program.command('show <trace>').description('Show trace timeline').action(async(p)=>console.log(timeline(await readTrace(p))));
 program.command('report <trace>').description('Generate a self-contained HTML trace report').option('-o, --output <file>','Output HTML file').action(async(p,options:{output?:string})=>{ const trace=await readTrace(p); const output=await writeTraceReport(trace,p,{output:options.output}); console.log(`Report written to ${output}`); });
+program.command('list').description('List recent traces with status and timings').option('-n, --limit <n>','Max traces to show (default 10)').option('-d, --dir <dir>','Trace directory (default: .agentrec/runs)').action(async(options:{limit?:string;dir?:string})=>{ const dir=options.dir??process.env.AGENTREC_RUN_DIR??DEFAULT_RUN_DIR; const limit=parseInt(options.limit??'10',10); let files:string[]; try{ const all=await readdir(dir); files=all.filter(f=>f.endsWith('.json')).map(f=>join(dir,f)); }catch{ console.log(pc.yellow(`No traces found in ${dir}. Run "agentrec init" to get started.`)); return; } if(!files.length){ console.log(pc.yellow(`No traces found in ${dir}. Record an agent run first.`)); return; } const withTimes=await Promise.all(files.map(async f=>{ try{ const s=await stat(f); return {path:f,mtime:s.mtimeMs}; }catch{ return null; } })); const sorted=(withTimes.filter(Boolean) as {path:string;mtime:number}[]).sort((a,b)=>b.mtime-a.mtime).slice(0,limit); console.log(pc.bold(`Recent traces (${sorted.length})\n`)); for(const {path} of sorted){ try{ const t=await readTrace(path); const duration=fmtDuration(t.durationMs); const status=fmtStatus(t.status); console.log(`${pc.dim(t.runId)}  ${status}  ${pc.dim(duration)}  ${pc.dim(String(t.events.length)+' events')}  ${pc.dim(path)}`); }catch{ console.log(`${pc.red('unreadable')}  ${pc.dim(path)}`); } } console.log(''); });
 program.command('replay <trace>').description('Print recorded replay outputs').action(async(p)=>{ const t=await readTrace(p); console.log(`Replay plan for ${t.runId}`); for(const e of t.events.filter(e=>e.type==='llm.response'||e.type==='tool.result')) console.log(`- ${e.type} ${e.name??''}: ${JSON.stringify(e.data)}`); });
 program.command('diff <a> <b>').description('Diff two traces').action(async(a,b)=>{ const diff=diffTraces(await readTrace(a),await readTrace(b)); if(diff.equal) console.log(pc.green('No regression detected. Traces match.')); else { console.log([pc.red('Regression detected:'),...diff.differences.map(d=>`- ${d}`)].join('\n')); process.exitCode=1; } });
 program.command('record').allowUnknownOption(true).argument('[cmd...]').description('Run command with agentrec env vars').action(async(cmd:string[])=>{ const [c,...args]=cmd; if(!c) throw new Error('Usage: agentrec record -- <command>'); await execa(c,args,{stdio:'inherit',env:{...process.env,AGENTREC_ENABLED:'1',AGENTREC_RUN_DIR:process.env.AGENTREC_RUN_DIR||'.agentrec/runs'}}); console.log('Command completed. Check .agentrec/runs for generated traces.'); });
