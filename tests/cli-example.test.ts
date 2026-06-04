@@ -1,0 +1,2 @@
+import { rm } from 'node:fs/promises'; import { execa } from 'execa'; import { describe, expect, it } from 'vitest';
+describe('cli + example',()=>{ it('creates trace and renders timeline',async()=>{ await rm('.agentrec',{recursive:true,force:true}); await execa('tsx',['examples/basic-agent/agent.ts']); const {stdout:files}=await execa('bash',['-lc','ls .agentrec/runs/*.json | tail -1']); const {stdout}=await execa('tsx',['src/cli/index.ts','show',files.trim()]); expect(stdout).toContain('Status: completed'); expect(stdout).toContain('basic-agent'); }, 15000); });

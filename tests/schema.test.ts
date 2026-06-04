@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { validateTrace } from '../src/core/schema.js';
+describe('trace schema',()=>{ it('accepts valid trace',()=>{ expect(()=>validateTrace({schemaVersion:'agentrec.trace.v1',runId:'run_1',status:'completed',startedAt:new Date().toISOString(),events:[]})).not.toThrow(); }); it('rejects missing runId',()=>{ expect(()=>validateTrace({schemaVersion:'agentrec.trace.v1',status:'completed',startedAt:new Date().toISOString(),events:[]})).toThrow(); }); it('rejects unknown event type',()=>{ expect(()=>validateTrace({schemaVersion:'agentrec.trace.v1',runId:'run_1',status:'completed',startedAt:new Date().toISOString(),events:[{id:'e',type:'wat',timestamp:new Date().toISOString()}]})).toThrow(); }); });

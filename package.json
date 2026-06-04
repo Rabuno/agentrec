@@ -1,0 +1,44 @@
+{
+  "name": "agentrec",
+  "version": "0.1.0",
+  "description": "Black box recorder for AI agents. Trace, replay, and regression-test every agent run before production.",
+  "type": "module",
+  "bin": {
+    "agentrec": "dist/cli/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "example": "tsx examples/basic-agent/agent.ts"
+  },
+  "keywords": [
+    "ai-agents",
+    "llm",
+    "observability",
+    "debugging",
+    "replay",
+    "evaluation",
+    "developer-tools"
+  ],
+  "author": "Rabuno",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.2",
+    "picocolors": "^1.1.1",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "execa": "^9.6.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  }
+}

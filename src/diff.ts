@@ -1,0 +1,3 @@
+import type { AgentTrace } from './core/types.js';
+export type TraceDiff={ equal:boolean; differences:string[] };
+export function diffTraces(a:AgentTrace,b:AgentTrace):TraceDiff{ const d:string[]=[]; if(a.status!==b.status)d.push(`status changed: ${a.status} -> ${b.status}`); if(JSON.stringify(a.output)!==JSON.stringify(b.output))d.push('final output changed'); if(a.events.length!==b.events.length)d.push(`event count changed: ${a.events.length} -> ${b.events.length}`); const at=a.events.filter(e=>e.type==='tool.call').map(e=>e.name); const bt=b.events.filter(e=>e.type==='tool.call').map(e=>e.name); if(JSON.stringify(at)!==JSON.stringify(bt))d.push(`tool call sequence changed: ${at.join(',')} -> ${bt.join(',')}`); return {equal:d.length===0,differences:d}; }

@@ -1,0 +1,5 @@
+node_modules
+dist
+.agentrec
+.DS_Store
+*.log
