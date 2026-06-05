@@ -1,4 +1,26 @@
 import { z } from 'zod';
-export const agentEventSchema = z.object({ id:z.string().min(1), type:z.enum(['run.started','run.finished','agent.step','llm.request','llm.response','tool.call','tool.result','error']), timestamp:z.string().datetime(), name:z.string().optional(), data:z.record(z.string(), z.unknown()).optional() });
-export const agentTraceSchema = z.object({ schemaVersion:z.literal('agentrec.trace.v1'), runId:z.string().min(1), status:z.enum(['running','completed','failed']), startedAt:z.string().datetime(), finishedAt:z.string().datetime().optional(), durationMs:z.number().nonnegative().optional(), input:z.unknown().optional(), output:z.unknown().optional(), metadata:z.record(z.string(), z.unknown()).optional(), events:z.array(agentEventSchema) });
-export function validateTrace(value: unknown) { return agentTraceSchema.parse(value); }
+
+export const agentEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['run.started', 'run.finished', 'agent.step', 'llm.request', 'llm.response', 'tool.call', 'tool.result', 'error']),
+  timestamp: z.string().datetime(),
+  name: z.string().optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const agentTraceSchema = z.object({
+  schemaVersion: z.literal('agentrec.trace.v1'),
+  runId: z.string().min(1),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime().optional(),
+  durationMs: z.number().nonnegative().optional(),
+  input: z.unknown().optional(),
+  output: z.unknown().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  events: z.array(agentEventSchema),
+});
+
+export function validateTrace(value: unknown) {
+  return agentTraceSchema.parse(value);
+}

@@ -1,9 +1,11 @@
 import { basename, dirname, join, parse } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { redactTrace, type RedactionOptions } from './core/redaction.js';
 import type { AgentEvent, AgentTrace } from './core/types.js';
 
 export type ReportOptions = {
   output?: string;
+  redaction?: RedactionOptions | false;
 };
 
 export function defaultReportPath(tracePath: string) {
@@ -13,7 +15,8 @@ export function defaultReportPath(tracePath: string) {
 
 export async function writeTraceReport(trace: AgentTrace, tracePath: string, options: ReportOptions = {}) {
   const outputPath = options.output ?? defaultReportPath(tracePath);
-  await writeFile(outputPath, renderTraceReport(trace, tracePath), 'utf8');
+  const reportTrace = options.redaction === false ? trace : redactTrace(trace, options.redaction);
+  await writeFile(outputPath, renderTraceReport(reportTrace, tracePath), 'utf8');
   return outputPath;
 }
 

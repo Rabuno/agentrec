@@ -1,10 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { execa } from 'execa';
 import { describe, expect, it } from 'vitest';
 import { TRACE_SCHEMA_VERSION, type AgentTrace } from '../src/core/types.js';
-import { defaultReportPath, renderTraceReport } from '../src/report.js';
+import { defaultReportPath, renderTraceReport, writeTraceReport } from '../src/report.js';
 
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
@@ -22,8 +22,8 @@ const trace: AgentTrace = {
     { id: 'evt_1', type: 'run.started', timestamp: '2026-01-01T00:00:00.000Z', name: 'run', data: { input: 'hello' } },
     { id: 'evt_2', type: 'tool.call', timestamp: '2026-01-01T00:00:00.300Z', name: 'search', data: { query: '<bad>' } },
     { id: 'evt_3', type: 'llm.request', timestamp: '2026-01-01T00:00:00.600Z', name: 'llm', data: { model: 'mock-model' } },
-    { id: 'evt_4', type: 'run.finished', timestamp: '2026-01-01T00:00:01.250Z', name: 'run', data: { output: 'done' } }
-  ]
+    { id: 'evt_4', type: 'run.finished', timestamp: '2026-01-01T00:00:01.250Z', name: 'run', data: { output: 'done' } },
+  ],
 };
 
 describe('trace reports', () => {
@@ -37,6 +37,40 @@ describe('trace reports', () => {
     expect(html).toContain('&lt;script&gt;alert(\\&quot;x\\&quot;)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert("x")</script>');
   });
+
+  it('redacts reports written through the report writer', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agentrec-report-redact-'));
+    const tracePath = join(dir, 'secret.trace.json');
+
+    try {
+      const reportPath = await writeTraceReport(
+        { ...trace, metadata: { ...trace.metadata, apiKey: 'super-secret-value' } },
+        tracePath,
+      );
+      const html = await readFile(reportPath, 'utf8');
+
+      expect(html).toContain('[REDACTED]');
+      expect(html).not.toContain('super-secret-value');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('supports disabling report redaction from the CLI', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agentrec-report-no-redact-'));
+    const tracePath = join(dir, 'secret.trace.json');
+    const reportPath = defaultReportPath(tracePath);
+
+    try {
+      await writeFile(tracePath, JSON.stringify({ ...trace, metadata: { ...trace.metadata, apiKey: 'super-secret-value' } }), 'utf8');
+      await execa('node', ['--import', 'tsx', 'src/cli/index.ts', 'report', tracePath, '--no-redaction']);
+      const html = await readFile(reportPath, 'utf8');
+
+      expect(html).toContain('super-secret-value');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 15000);
 
   it('writes the default report next to the trace from the CLI', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'agentrec-report-'));

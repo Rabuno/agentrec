@@ -24,11 +24,12 @@ Production AI agents are opaque. When an agent breaks in production, you need mo
 ## Key Features
 
 - **Record** — Capture prompts, tool calls, LLM responses, timings, and metadata as portable JSON traces.
-- **Replay** — Replay recorded outputs for deterministic testing and debugging.
-- **Diff** — Compare two traces to detect output and tool-call regressions.
+- **Replay** — Replay recorded outputs in original event order for deterministic testing and debugging.
+- **Diff** — Compare traces with stable object ordering, nested event-data checks, and volatile-field ignores.
 - **Report** — Generate self-contained HTML reports you can share or archive.
+- **Redaction** — Replace common secret keys and token-like strings before saving traces or reports.
 - **CLI & SDK** — Use the CLI for quick inspection, or the TypeScript SDK for programmatic recording.
-- **CI-ready** — `agentrec test` compares new traces to baselines with exit-code signaling.
+- **CI-ready** — `agentrec test` compares new traces to baselines with exit-code signaling and isolated run directories.
 
 ## Quickstart
 
@@ -53,7 +54,13 @@ npx agentrec show "$TRACE"
 ```ts
 import { createRecorder } from 'agentrec';
 
-const recorder = createRecorder({ metadata: { agent: 'support-bot', v: '1.2.0' } });
+const recorder = createRecorder({
+  metadata: { agent: 'support-bot', v: '1.2.0' },
+  // Redaction is enabled by default for common secret keys/token-like strings.
+  redaction: {
+    rules: [{ key: 'apiKey' }, { path: 'metadata.customerEmail' }, { pattern: /Bearer\s+\S+/g }]
+  }
+});
 recorder.startRun({ question: 'How do I debug an agent?' });
 
 recorder.recordToolCall('search', { query: 'agent debugging' });
@@ -72,11 +79,11 @@ await recorder.finishRun({ answer: 'Use a flight recorder.' });
 | `agentrec init` | Create `.agentrec/` folders and config. |
 | `agentrec record -- <cmd>` | Run a command with agentrec env vars. |
 | `agentrec show <trace>` | Render a trace timeline to stdout. |
-| `agentrec report <trace>` | Generate a self-contained HTML report. |
+| `agentrec report <trace>` | Generate a self-contained HTML report with default redaction. |
 | `agentrec list` | List recent traces with status and timings. |
 | `agentrec replay <trace>` | Print recorded replay outputs. |
-| `agentrec diff <a> <b>` | Detect output/tool-call regressions. |
-| `agentrec test <baseline> -- <cmd>` | Run and compare latest trace to baseline. |
+| `agentrec diff <a> <b>` | Detect output/event/tool-call regressions. |
+| `agentrec test <baseline> -- <cmd>` | Run command in an isolated trace dir and compare its trace to baseline. |
 
 ## Quick demo: record → show → report → diff
 
@@ -113,7 +120,7 @@ Not an agent framework, not a SaaS dashboard, and not a full observability platf
 
 ## Roadmap
 
-Vercel AI SDK wrapper, LangChain adapter, redaction policies, GitHub Action, OpenTelemetry export, Python SDK.
+Vercel AI SDK wrapper, LangChain adapter, GitHub Action, OpenTelemetry export, Python SDK.
 
 ## Contributing
 
