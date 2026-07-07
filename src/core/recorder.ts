@@ -16,6 +16,8 @@ export type RecorderOptions = {
 
 export class AgentRecorder {
   private trace: AgentTrace | null = null;
+  private writeQueue: Promise<unknown> = Promise.resolve();
+  private lastWriteError: unknown = null;
 
   constructor(private options: RecorderOptions = {}) {}
 
@@ -37,6 +39,7 @@ export class AgentRecorder {
   }
 
   recordEvent(type: AgentEventType, name?: string, data?: Record<string, unknown>): AgentEvent {
+    this.throwIfWriteFailed();
     const trace = this.currentTrace();
     if (trace.status !== 'running') {
       throw new Error(`Cannot record ${type} event after run is ${trace.status}.`);
@@ -51,6 +54,7 @@ export class AgentRecorder {
     };
 
     trace.events.push(event);
+    this.scheduleIncrementalWrite();
     return event;
   }
 
@@ -85,7 +89,9 @@ export class AgentRecorder {
     trace.output = output;
     trace.durationMs = durationMs(trace.startedAt, finishedAt);
 
-    return this.persistIfNeeded(trace);
+    const result = await this.persistIfNeeded(trace);
+    this.throwIfWriteFailed();
+    return result;
   }
 
   async failRun(error: unknown) {
@@ -102,7 +108,9 @@ export class AgentRecorder {
     trace.finishedAt = finishedAt;
     trace.durationMs = durationMs(trace.startedAt, finishedAt);
 
-    return this.persistIfNeeded(trace);
+    const result = await this.persistIfNeeded(trace);
+    this.throwIfWriteFailed();
+    return result;
   }
 
   currentTrace() {
@@ -128,14 +136,42 @@ export class AgentRecorder {
   }
 
   private async persistIfNeeded(trace: AgentTrace) {
-    const finalTrace = this.options.redaction === false ? trace : redactTrace(trace, this.options.redaction);
+    const finalTrace = this.applyRedaction(trace);
     this.trace = finalTrace;
 
     if (this.options.autoSave ?? true) {
-      await saveTrace(finalTrace, this.options.runDir);
+      this.writeQueue = this.writeQueue.then(() => saveTrace(finalTrace, this.options.runDir));
+      await this.writeQueue;
     }
 
     return finalTrace;
+  }
+
+  /** Fire-and-forget: keeps the trace file live so a crash mid-run doesn't lose it. Failures surface on the next call. */
+  private scheduleIncrementalWrite() {
+    if (!(this.options.autoSave ?? true)) return;
+
+    this.writeQueue = this.writeQueue.then(() => this.writeCurrentSnapshot()).catch((error) => {
+      this.lastWriteError = error;
+    });
+  }
+
+  private async writeCurrentSnapshot() {
+    const trace = this.trace;
+    if (!trace) return;
+    await saveTrace(this.applyRedaction(trace), this.options.runDir);
+  }
+
+  private applyRedaction(trace: AgentTrace): AgentTrace {
+    return this.options.redaction === false ? trace : redactTrace(trace, this.options.redaction);
+  }
+
+  private throwIfWriteFailed() {
+    if (this.lastWriteError !== null) {
+      const error = this.lastWriteError;
+      this.lastWriteError = null;
+      throw error;
+    }
   }
 }
 
