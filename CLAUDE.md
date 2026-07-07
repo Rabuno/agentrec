@@ -121,3 +121,17 @@ Avoid:
 - Silent exception handling
 - Overly broad LLM-as-judge features before deterministic checks are strong
 - PR spam when an automation PR is already open
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`Rabuno/agentrec`), via the `gh` CLI. External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) — no repo-specific overrides. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
