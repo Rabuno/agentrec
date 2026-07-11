@@ -30,6 +30,7 @@ Production AI agents are opaque. When an agent breaks in production, you need mo
 - **Redaction** — Replace common secret keys and token-like strings before saving traces or reports.
 - **CLI & SDK** — Use the CLI for quick inspection, or the TypeScript SDK for programmatic recording.
 - **CI-ready** — `agentrec test` compares new traces to baselines with exit-code signaling and isolated run directories.
+- **Adapters** — transparent recording for the Vercel AI SDK: wrap a model once per run, no per-step record calls (see [Adapters](#adapters) below).
 
 ## Quickstart
 
@@ -71,6 +72,36 @@ recorder.recordLlmResponse({ text: 'Use a flight recorder.' });
 
 await recorder.finishRun({ answer: 'Use a flight recorder.' });
 ```
+
+## Adapters
+
+### Vercel AI SDK — transparent recording
+
+Wrap a model once per run with `agentrecMiddleware` and every `generateText`/`streamText`
+call in that run is recorded automatically — no per-step `recordLlmRequest`/`recordToolCall` calls.
+
+```ts
+import { createRecorder } from 'agentrec';
+import { agentrecMiddleware } from 'agentrec/ai';
+import { wrapLanguageModel, generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const recorder = createRecorder({ metadata: { agent: 'support-bot' } });
+recorder.startRun({ question });
+
+const model = wrapLanguageModel({ model: openai('gpt-4o'), middleware: agentrecMiddleware(recorder) });
+const { text } = await generateText({ model, prompt: question, tools });
+
+await recorder.finishRun({ text });
+```
+
+Requires `ai@^7.0.0` as a peer dependency. LLM requests/responses and tool calls are
+recorded automatically; tool *results* are reconstructed from the next step's prompt,
+so a run that ends mid-tool-call (no further step) won't have its last tool result
+recorded. Wrap a fresh model per run (`wrapLanguageModel(...)` inside your run function,
+not module-level) — reusing one wrapped model across multiple runs keeps a
+tool-call-ID dedupe set that grows for the process lifetime. See
+[`examples/vercel-ai-sdk`](examples/vercel-ai-sdk) for a runnable, no-API-key example.
 
 ### CLI commands
 
