@@ -17,6 +17,10 @@
     "./ai": {
       "types": "./dist/adapters/ai.d.ts",
       "import": "./dist/adapters/ai.js"
+    },
+    "./openai": {
+      "types": "./dist/adapters/openai.d.ts",
+      "import": "./dist/adapters/openai.js"
     }
   },
   "scripts": {
@@ -56,6 +60,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "ai": "7.0.22",
+    "openai": "6.46.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
