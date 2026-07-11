@@ -45,7 +45,7 @@ npx agentrec record -- npx tsx -e "
   r.recordToolResult('lookup', {value: 'world'});
   r.finishRun({answer: 'world'});
 "
-TRACE=$(ls -t .agentrec/runs/*.json | head -1)
+TRACE=$(npx agentrec latest)
 npx agentrec show "$TRACE"
 ```
 
@@ -81,6 +81,7 @@ await recorder.finishRun({ answer: 'Use a flight recorder.' });
 | `agentrec show <trace>` | Render a trace timeline to stdout. |
 | `agentrec report <trace>` | Generate a self-contained HTML report with default redaction. |
 | `agentrec list` | List recent traces with status and timings. |
+| `agentrec latest` | Print the path of the newest finished trace (skips still-running runs). |
 | `agentrec replay <trace>` | Print recorded replay outputs. |
 | `agentrec diff <a> <b>` | Detect output/event/tool-call regressions. |
 | `agentrec test <baseline> -- <cmd>` | Run command in an isolated trace dir and compare its trace to baseline. |
@@ -91,7 +92,7 @@ await recorder.finishRun({ answer: 'Use a flight recorder.' });
 npm ci && npm run build
 npm run example
 
-TRACE=$(ls -t .agentrec/runs/*.json | head -1)
+TRACE=$(npx agentrec latest)
 npx agentrec list
 npx agentrec show "$TRACE"
 npx agentrec report "$TRACE" --output /tmp/agentrec-demo.html
