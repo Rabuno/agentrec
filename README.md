@@ -30,7 +30,7 @@ Production AI agents are opaque. When an agent breaks in production, you need mo
 - **Redaction** — Replace common secret keys and token-like strings before saving traces or reports.
 - **CLI & SDK** — Use the CLI for quick inspection, or the TypeScript SDK for programmatic recording.
 - **CI-ready** — `agentrec test` compares new traces to baselines with exit-code signaling and isolated run directories.
-- **Adapters** — transparent recording for the Vercel AI SDK: wrap a model once per run, no per-step record calls (see [Adapters](#adapters) below).
+- **Adapters** — transparent recording for the Vercel AI SDK and the OpenAI SDK: wrap once per run, no per-step record calls (see [Adapters](#adapters) below).
 
 ## Quickstart
 
@@ -102,6 +102,42 @@ recorded. Wrap a fresh model per run (`wrapLanguageModel(...)` inside your run f
 not module-level) — reusing one wrapped model across multiple runs keeps a
 tool-call-ID dedupe set that grows for the process lifetime. See
 [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk) for a runnable, no-API-key example.
+
+### OpenAI SDK — transparent recording
+
+Wrap a client once with `wrapOpenAI` and every `chat.completions.create()` call is
+recorded automatically — no per-call `recordLlmRequest`/`recordToolCall` calls.
+
+```ts
+import { createRecorder } from 'agentrec';
+import { wrapOpenAI } from 'agentrec/openai';
+import OpenAI from 'openai';
+
+const recorder = createRecorder({ metadata: { agent: 'support-bot' } });
+recorder.startRun({ question });
+
+const client = wrapOpenAI(new OpenAI(), recorder);
+const completion = await client.chat.completions.create({ model: 'gpt-4o', messages, tools });
+
+await recorder.finishRun({ text: completion.choices[0]?.message.content });
+```
+
+`wrapOpenAI` **mutates the client you pass in and returns it** (not a copy) — reassigns
+`chat.completions.create` in place so every other resource on the client and helpers
+built on `create` (`.parse()`, `.stream()`, `runTools()`) keep working. LLM requests/
+responses and function tool calls are recorded automatically; tool *results* are
+reconstructed from the next request's `messages` array, so a run that ends mid-tool-call
+(no further request) won't have its last tool result recorded. `stream.tee()` bypasses
+recording for the teed branch. Covers the Chat Completions API only (not yet the
+Responses API).
+
+**Wrap the client once, not per run** — unlike the Vercel AI SDK adapter above (where
+`wrapLanguageModel` returns a fresh, cheap-to-recreate model object), `wrapOpenAI`
+mutates the client and its recorder is fixed at wrap time. Calling `wrapOpenAI` again
+on the same client double-wraps it (every call then records twice). For multiple runs,
+wrap once and call `recorder.startRun()`/`finishRun()` per run on that same recorder —
+`AgentRecorder` supports being reused sequentially across runs. See
+[`examples/openai-adapter`](examples/openai-adapter) for a runnable, no-API-key example.
 
 ### CLI commands
 
