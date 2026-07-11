@@ -123,6 +123,26 @@ program
   });
 
 program
+  .command('latest')
+  .description('Print the path of the newest finished trace (skips still-running runs)')
+  .option('-d, --dir <dir>', 'Trace directory (default: .agentrec/runs)')
+  .action(async (options: { dir?: string }) => {
+    const dir = options.dir ?? process.env.AGENTREC_RUN_DIR ?? DEFAULT_RUN_DIR;
+    try {
+      console.log(await latestTracePath(dir));
+    } catch (error) {
+      const message =
+        error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT'
+          ? `No traces found in ${dir}. Run "agentrec init" to get started.`
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      console.error(pc.yellow(message));
+      process.exitCode = 1;
+    }
+  });
+
+program
   .command('replay <trace>')
   .description('Print recorded replay outputs')
   .action(async (path) => {
