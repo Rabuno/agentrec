@@ -48,20 +48,21 @@ If a change touches user-facing behavior, update README or examples.
 
 ## Product Roadmap Priority
 
-Optimize for 10k-star potential by prioritizing developer-visible leverage:
+Prioritize removing adoption-blocking friction over adding deeper features. (Reordered 2026-07-12 after oryna review: manual-instrumentation-only recording was the actual adoption blocker, not missing baseline/report features. Adapters — transparent recording — and proof-it-works demo assets move ahead of everything else.)
 
-1. Golden trace baselines
-2. `agentrec latest`
-3. `agentrec baseline create/update/list`
-4. `agentrec test` YAML config
-5. Better local trace viewer / report UI
-6. `agentrec diff --json`
-7. OpenAI adapter
-8. Vercel AI SDK adapter
+1. `agentrec latest` (in flight, finish it)
+2. Vercel AI SDK adapter — transparent instrumentation, no manual `recordToolCall` calls required
+3. OpenAI SDK adapter — same reasoning
+4. README screenshots/GIF/docs polish — demo assets ship right after there's something frictionless to demo
+5. Golden trace baselines
+6. `agentrec baseline create/update/list`
+7. Better local trace viewer / report UI
+8. `agentrec diff --json`
 9. GitHub Action
 10. PR comment reporter
 11. More examples with mock mode
-12. README screenshots/GIF/docs polish
+
+Cut/deferred indefinitely: `agentrec test` YAML config — this is promptfoo's home turf (23k stars, YAML-driven eval config already dominant there); competing head-on there is the worst available fight. The regression-test-runner positioning still holds via baselines + `diff`; only the YAML convenience layer on top is cut. Revisit only if adapters + demo actually drive real (non-author) trace volume.
 
 Scope weighting target:
 
@@ -69,6 +70,8 @@ Scope weighting target:
 - 25% adapters/examples
 - 20% docs/README/demo polish
 - 15% internal quality/testing
+
+Success bar: honest target is ~1k stars + real non-author usage in 12 months, not 10k. Re-evaluate after adapters + demo GIF + one launch post: if npm downloads spike then flatten and every issue is self-filed, stop investing in growth.
 
 ## Daily PR Value Threshold
 
