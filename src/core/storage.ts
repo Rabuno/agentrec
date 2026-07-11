@@ -24,6 +24,14 @@ export async function latestTracePath(runDir = process.env.AGENTREC_RUN_DIR || D
   if (!files.length) throw new Error(`No trace files found in ${runDir}`);
 
   const withTimes = await Promise.all(files.map(async (file) => [file, (await stat(file)).mtimeMs] as const));
-  withTimes.sort((a, b) => a[1] - b[1]);
-  return withTimes.at(-1)![0];
+  withTimes.sort((a, b) => b[1] - a[1]);
+
+  // Incremental persistence can leave a trace file mid-run (status: 'running') on disk;
+  // skip those and return the newest run that actually finished.
+  for (const [file] of withTimes) {
+    const trace = await readTrace(file);
+    if (trace.status !== 'running') return file;
+  }
+
+  throw new Error(`No completed trace found in ${runDir}; the latest run may still be in progress or crashed before finishing.`);
 }
