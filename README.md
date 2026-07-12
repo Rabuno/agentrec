@@ -154,6 +154,9 @@ wrap once and call `recorder.startRun()`/`finishRun()` per run on that same reco
 | `agentrec replay <trace>` | Print recorded replay outputs. |
 | `agentrec diff <a> <b>` | Detect output/event/tool-call regressions. |
 | `agentrec test <baseline> -- <cmd>` | Run command in an isolated trace dir and compare its trace to baseline. |
+| `agentrec baseline create <name> [trace]` | Save a trace (default: latest) as a named baseline. |
+| `agentrec baseline update <name> [trace]` | Update a baseline — prints the diff before overwriting. |
+| `agentrec baseline list` | List saved baselines with status and timings. |
 
 ## Quick demo: record → show → report → diff
 
@@ -166,6 +169,10 @@ npx agentrec list
 npx agentrec show "$TRACE"
 npx agentrec report "$TRACE" --output /tmp/agentrec-demo.html
 npx agentrec diff "$TRACE" "$TRACE"   # should print "No regression detected"
+
+npx agentrec baseline create happy-path "$TRACE"
+npx agentrec baseline list
+npx agentrec test happy-path -- npm run example   # compares the next run against the baseline
 ```
 
 ![agentrec trace report header, summary metrics, and status badge](docs/images/report.gif)

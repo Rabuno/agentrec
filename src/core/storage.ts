@@ -4,6 +4,30 @@ import { validateTrace } from './schema.js';
 import type { AgentTrace } from './types.js';
 
 export const DEFAULT_RUN_DIR = '.agentrec/runs';
+export const DEFAULT_BASELINE_DIR = '.agentrec/baselines';
+
+export function baselinePath(name: string, dir = DEFAULT_BASELINE_DIR) {
+  return join(dir, `${name}.json`);
+}
+
+export async function saveBaseline(name: string, trace: AgentTrace, dir = DEFAULT_BASELINE_DIR) {
+  validateTrace(trace);
+  await mkdir(dir, { recursive: true });
+
+  const path = baselinePath(name, dir);
+  await writeFile(path, `${JSON.stringify(trace, null, 2)}\n`, 'utf8');
+  return path;
+}
+
+export async function listBaselineNames(dir = DEFAULT_BASELINE_DIR): Promise<string[]> {
+  try {
+    const files = await readdir(dir);
+    return files.filter((file) => file.endsWith('.json')).map((file) => file.slice(0, -'.json'.length));
+  } catch (error) {
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
 
 export async function saveTrace(trace: AgentTrace, runDir = process.env.AGENTREC_RUN_DIR || DEFAULT_RUN_DIR) {
   validateTrace(trace);
