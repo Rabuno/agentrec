@@ -10,6 +10,8 @@
 
 No SaaS. No account. No vendor lock-in. Traces stay on disk in your repo or CI artifacts.
 
+![agentrec trace report — status badge, summary metrics, metadata/input/output panels, and the full events timeline](docs/images/report-demo.gif)
+
 ## Why agentrec?
 
 Production AI agents are opaque. When an agent breaks in production, you need more than logs — you need the full flight recording. agentrec captures every step of an agent run so you can:
@@ -166,6 +168,8 @@ npx agentrec report "$TRACE" --output /tmp/agentrec-demo.html
 npx agentrec diff "$TRACE" "$TRACE"   # should print "No regression detected"
 ```
 
+![agentrec trace report header, summary metrics, and status badge](docs/images/report.gif)
+
 Open `/tmp/agentrec-demo.html` in your browser to see the full trace report.
 
 ## Examples
@@ -188,7 +192,7 @@ Not an agent framework, not a SaaS dashboard, and not a full observability platf
 
 ## Roadmap
 
-Vercel AI SDK wrapper, LangChain adapter, GitHub Action, OpenTelemetry export, Python SDK.
+LangChain adapter, GitHub Action, OpenTelemetry export, Python SDK.
 
 ## Contributing
 
