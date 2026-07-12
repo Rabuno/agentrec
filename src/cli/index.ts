@@ -5,7 +5,15 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import { execa } from 'execa';
 import pc from 'picocolors';
-import { DEFAULT_RUN_DIR, latestTracePath, readTrace } from '../core/storage.js';
+import {
+  DEFAULT_BASELINE_DIR,
+  DEFAULT_RUN_DIR,
+  baselinePath,
+  latestTracePath,
+  listBaselineNames,
+  readTrace,
+  saveBaseline,
+} from '../core/storage.js';
 import type { AgentTrace } from '../core/types.js';
 import { diffTraces } from '../diff.js';
 import { writeTraceReport } from '../report.js';
@@ -32,6 +40,35 @@ function timeline(trace: AgentTrace) {
 function fmtDuration(ms: number | undefined): string {
   if (ms === undefined) return 'n/a';
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+function isEnoent(error: unknown): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT';
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (isEnoent(error)) return false;
+    throw error;
+  }
+}
+
+async function resolveLatestTrace(): Promise<string | undefined> {
+  try {
+    return await latestTracePath();
+  } catch (error) {
+    const message = isEnoent(error)
+      ? `No traces found. Run "agentrec init" to get started.`
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    console.error(pc.yellow(message));
+    process.exitCode = 1;
+    return undefined;
+  }
 }
 
 function fmtStatus(status: string): string {
@@ -164,6 +201,87 @@ program
       console.log([pc.red('Regression detected:'), ...diff.differences.map((difference) => `- ${difference}`)].join('\n'));
       process.exitCode = 1;
     }
+  });
+
+const baselineGroup = program.command('baseline').description('Manage golden baselines');
+
+baselineGroup
+  .command('create <name> [trace]')
+  .description('Save a trace as a named baseline')
+  .option('-d, --dir <dir>', 'Baseline directory (default: .agentrec/baselines)')
+  .action(async (name: string, trace: string | undefined, options: { dir?: string }) => {
+    const dir = options.dir ?? DEFAULT_BASELINE_DIR;
+
+    if (await exists(baselinePath(name, dir))) {
+      console.error(`Baseline "${name}" exists. Use "agentrec baseline update ${name}" to change it.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const source = trace ?? (await resolveLatestTrace());
+    if (!source) return;
+
+    const parsed = await readTrace(source);
+    const path = await saveBaseline(name, parsed, dir);
+    console.log(`Baseline "${name}" created from ${source} -> ${path}`);
+  });
+
+baselineGroup
+  .command('update <name> [trace]')
+  .description('Update an existing baseline, printing the diff before overwriting')
+  .option('-d, --dir <dir>', 'Baseline directory (default: .agentrec/baselines)')
+  .action(async (name: string, trace: string | undefined, options: { dir?: string }) => {
+    const dir = options.dir ?? DEFAULT_BASELINE_DIR;
+    const existingPath = baselinePath(name, dir);
+
+    if (!(await exists(existingPath))) {
+      console.error(`Baseline "${name}" does not exist. Use "agentrec baseline create ${name}" first.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const source = trace ?? (await resolveLatestTrace());
+    if (!source) return;
+
+    const [existing, incoming] = await Promise.all([readTrace(existingPath), readTrace(source)]);
+    const diff = diffTraces(existing, incoming);
+
+    if (diff.equal) {
+      console.log(`Baseline "${name}" already matches; nothing to update.`);
+      return;
+    }
+
+    console.log([`Updating baseline "${name}":`, ...diff.differences.map((difference) => `- ${difference}`)].join('\n'));
+    const path = await saveBaseline(name, incoming, dir);
+    console.log(`Baseline "${name}" updated -> ${path}`);
+  });
+
+baselineGroup
+  .command('list')
+  .description('List saved baselines')
+  .option('-d, --dir <dir>', 'Baseline directory (default: .agentrec/baselines)')
+  .action(async (options: { dir?: string }) => {
+    const dir = options.dir ?? DEFAULT_BASELINE_DIR;
+    const names = await listBaselineNames(dir);
+
+    if (!names.length) {
+      console.log(pc.yellow(`No baselines yet. Create one with "agentrec baseline create <name>".`));
+      return;
+    }
+
+    console.log(pc.bold(`Baselines (${names.length})\n`));
+    for (const name of names) {
+      try {
+        const trace = await readTrace(baselinePath(name, dir));
+        console.log(
+          `${pc.dim(name)}  ${fmtStatus(trace.status)}  ${pc.dim(fmtDuration(trace.durationMs))}  ${pc.dim(`${trace.events.length} events`)}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`${pc.red('unreadable')}  ${pc.dim(name)}  ${pc.dim(message)}`);
+      }
+    }
+    console.log('');
   });
 
 program
