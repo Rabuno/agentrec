@@ -51,6 +51,9 @@ jobs:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          # Default model (gemini-3.5-flash) hit the free-tier daily quota
+          # during testing; flash-lite is a separate model with its own quota.
+          gemini_model: 'gemini-3.1-flash-lite'
           prompt: |
             Review this pull request for correctness, security issues, and adherence to the
             conventions in CLAUDE.md and CONTRIBUTING.md. Run `git diff origin/${{ github.base_ref }}...HEAD`
@@ -127,6 +130,7 @@ jobs:
           GITHUB_TOKEN: ''
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_model: 'gemini-3.1-flash-lite'
           prompt: |
             Issue title: ${{ github.event.issue.title }}
             Issue body: ${{ github.event.issue.body }}
