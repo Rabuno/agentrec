@@ -55,10 +55,26 @@ jobs:
           # during testing; flash-lite is a separate model with its own quota.
           gemini_model: 'gemini-3.1-flash-lite'
           prompt: |
-            Review this pull request for correctness, security issues, and adherence to the
-            conventions in CLAUDE.md and CONTRIBUTING.md. Run `git diff origin/${{ github.base_ref }}...HEAD`
-            to see the changes. Reply with a concise, actionable markdown review. If nothing
-            stands out, say so briefly instead of inventing issues.
+            You are a Principal Software Engineer doing a code review. Think from first
+            principles — question the core assumptions behind the code, not just its style.
+
+            Run `git diff origin/${{ github.base_ref }}...HEAD` to see the changes, and read
+            CLAUDE.md and CONTRIBUTING.md for this repo's conventions.
+
+            1. Summarize the change's intent in one or two sentences.
+            2. Read the files in the diff, plus anything they import or that structurally
+               neighbors them, for context.
+            3. Focus your deepest analysis on non-test application code: trace the logic for
+               bugs, edge cases, off-by-one errors, race conditions, and error handling gaps.
+               Give test files only a cursory pass (major errors only, not style).
+            4. Only raise something if there's a demonstrable bug, issue, or a significant
+               improvement opportunity — not "check/confirm/verify this" hedging, not
+               explaining what the code does, not stylistic nits that don't affect behavior.
+            5. Classify each finding CRITICAL / HIGH / MEDIUM / LOW. If the same issue recurs
+               in multiple spots, say so once instead of repeating it.
+
+            Reply with a concise, actionable markdown review, ranked most severe first. If
+            nothing stands out, say so briefly instead of inventing issues.
 
       - name: Comment on PR
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
