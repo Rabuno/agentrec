@@ -13,6 +13,12 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
+## Automated triage
+
+`.github/workflows/gemini.yml` applies one label from the canonical vocabulary in
+[`triage-labels.md`](triage-labels.md) to new issues automatically. Treat it the
+same as a human-applied label — verify it still fits before acting on it.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.**

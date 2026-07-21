@@ -1,0 +1,178 @@
+name: Gemini
+
+on:
+  pull_request:
+    branches: [main]
+  issues:
+    types: [opened]
+
+concurrency:
+  group: gemini-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      has_key: ${{ steps.check.outputs.has_key }}
+    steps:
+      - id: check
+        run: echo "has_key=${{ secrets.GEMINI_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+  pr-review:
+    needs: gate
+    if: >-
+      needs.gate.outputs.has_key == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # The CLI runs with shell/file access over untrusted PR content
+          # (prompt-injection risk) — don't let it inherit a write-scoped
+          # git credential helper via the checkout.
+          persist-credentials: false
+
+      - name: Run Gemini review
+        id: gemini
+        uses: google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489 # v0.1.22
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Review this pull request for correctness, security issues, and adherence to the
+            conventions in CLAUDE.md and CONTRIBUTING.md. Run `git diff origin/${{ github.base_ref }}...HEAD`
+            to see the changes. Reply with a concise, actionable markdown review. If nothing
+            stands out, say so briefly instead of inventing issues.
+
+      - name: Comment on PR
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REVIEW_SUMMARY: ${{ steps.gemini.outputs.summary }}
+        with:
+          script: |
+            const marker = '<!-- gemini-pr-review -->';
+            const body = `${marker}\n### Gemini review\n\n${process.env.REVIEW_SUMMARY || '_No summary returned._'}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  issue-triage:
+    needs: gate
+    if: needs.gate.outputs.has_key == 'true' && github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      labels: ${{ steps.gemini.outputs.summary }}
+    steps:
+      - name: Get canonical triage labels
+        id: get_labels
+        # Candidate set is the fixed five-role vocabulary from
+        # docs/agents/triage-labels.md, intersected with labels that actually
+        # exist on the repo — not the full label list, so Gemini can only ever
+        # pick a documented triage role, not an arbitrary area/type label.
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const canonical = ['needs-triage', 'needs-info', 'ready-for-agent', 'ready-for-human', 'wontfix'];
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const existing = new Set(labels.map((l) => l.name));
+            core.setOutput('available', canonical.filter((l) => existing.has(l)).join(','));
+
+      - name: Run Gemini triage
+        id: gemini
+        if: steps.get_labels.outputs.available != ''
+        uses: google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489 # v0.1.22
+        env:
+          # Issue content is untrusted input — no write-scoped token reaches the CLI.
+          GITHUB_TOKEN: ''
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Issue title: ${{ github.event.issue.title }}
+            Issue body: ${{ github.event.issue.body }}
+
+            Available labels (this repo's fixed triage vocabulary, from
+            docs/agents/triage-labels.md): ${{ steps.get_labels.outputs.available }}
+              needs-triage    - maintainer needs to evaluate this issue
+              needs-info      - waiting on the reporter for more information
+              ready-for-agent - fully specified, ready for an AFK coding agent
+              ready-for-human - requires human implementation or judgement
+              wontfix         - will not be actioned
+
+            Pick the label(s), from the available list only, that best fit this issue.
+            Reply with ONLY a comma-separated label list, nothing else.
+
+  apply-labels:
+    needs: [gate, issue-triage]
+    if: needs.gate.outputs.has_key == 'true' && needs.issue-triage.outputs.labels != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Apply labels
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          SELECTED_LABELS: ${{ needs.issue-triage.outputs.labels }}
+        with:
+          script: |
+            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const valid = new Set(repoLabels.map((l) => l.name));
+            // Only ever apply labels that already exist on the repo — defends
+            // against the issue body prompt-injecting arbitrary label names.
+            const selected = (process.env.SELECTED_LABELS || '')
+              .split(',')
+              .map((l) => l.trim())
+              .filter((l) => valid.has(l));
+
+            if (selected.length > 0) {
+              await github.rest.issues.setLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: process.env.ISSUE_NUMBER,
+                labels: selected,
+              });
+            }
