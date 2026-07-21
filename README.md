@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/agentrec?style=flat-square)](https://www.npmjs.com/package/agentrec)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Rabuno/agentrec/ci.yml?style=flat-square)](https://github.com/Rabuno/agentrec/actions)
+[![CodeQL](https://github.com/Rabuno/agentrec/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Rabuno/agentrec/security/code-scanning)
 
 > Ship AI agents with a black box recorder: local traces, replayable outputs, HTML reports, and CI regression checks.
 
