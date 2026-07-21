@@ -26,6 +26,7 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "example": "tsx examples/basic-agent/agent.ts"
   },
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "ai": "7.0.22",
     "openai": "6.46.0",
     "tsup": "^8.5.1",
