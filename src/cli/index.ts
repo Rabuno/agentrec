@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Command } from 'commander';
@@ -11,7 +11,9 @@ import {
   baselinePath,
   latestTracePath,
   listBaselineNames,
+  listTraces,
   readTrace,
+  resolveRunDir,
   saveBaseline,
 } from '../core/storage.js';
 import type { AgentTrace } from '../core/types.js';
@@ -112,13 +114,12 @@ program
   .option('-n, --limit <n>', 'Max traces to show (default 10)')
   .option('-d, --dir <dir>', 'Trace directory (default: .agentrec/runs)')
   .action(async (options: { limit?: string; dir?: string }) => {
-    const dir = options.dir ?? process.env.AGENTREC_RUN_DIR ?? DEFAULT_RUN_DIR;
+    const dir = resolveRunDir(options.dir);
     const limit = parseInt(options.limit ?? '10', 10);
 
-    let files: string[];
+    let files: { path: string; mtime: number }[];
     try {
-      const all = await readdir(dir);
-      files = all.filter((file) => file.endsWith('.json')).map((file) => join(dir, file));
+      files = await listTraces(dir);
     } catch {
       console.log(pc.yellow(`No traces found in ${dir}. Run "agentrec init" to get started.`));
       return;
@@ -129,19 +130,7 @@ program
       return;
     }
 
-    const withTimes = await Promise.all(
-      files.map(async (path) => {
-        try {
-          const stats = await stat(path);
-          return { path, mtime: stats.mtimeMs };
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const sorted = (withTimes.filter(Boolean) as { path: string; mtime: number }[])
-      .sort((a, b) => b.mtime - a.mtime)
-      .slice(0, limit);
+    const sorted = files.slice(0, limit);
 
     console.log(pc.bold(`Recent traces (${sorted.length})\n`));
     for (const { path } of sorted) {
@@ -164,7 +153,7 @@ program
   .description('Print the path of the newest finished trace (skips still-running runs)')
   .option('-d, --dir <dir>', 'Trace directory (default: .agentrec/runs)')
   .action(async (options: { dir?: string }) => {
-    const dir = options.dir ?? process.env.AGENTREC_RUN_DIR ?? DEFAULT_RUN_DIR;
+    const dir = resolveRunDir(options.dir);
     try {
       console.log(await latestTracePath(dir));
     } catch (error) {

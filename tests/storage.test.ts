@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { latestTracePath, saveTrace } from '../src/core/storage.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { DEFAULT_RUN_DIR, latestTracePath, listTraces, resolveRunDir, saveTrace } from '../src/core/storage.js';
 import { TRACE_SCHEMA_VERSION, type AgentTrace } from '../src/core/types.js';
 
 async function tempDir() {
@@ -42,5 +42,71 @@ describe('latestTracePath', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('listTraces', () => {
+  it('sorts trace files newest-first by mtime', async () => {
+    const dir = await tempDir();
+    try {
+      const older = await saveTrace(makeTrace({ runId: 'run_older' }), dir);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const newer = await saveTrace(makeTrace({ runId: 'run_newer' }), dir);
+
+      const files = await listTraces(dir);
+      expect(files.map((f) => f.path)).toEqual([newer, older]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores non-.json files', async () => {
+    const dir = await tempDir();
+    try {
+      await saveTrace(makeTrace({ runId: 'run_a' }), dir);
+      await writeFile(join(dir, 'notes.txt'), 'not a trace', 'utf8');
+
+      const files = await listTraces(dir);
+      expect(files).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns an empty array for an empty dir', async () => {
+    const dir = await tempDir();
+    try {
+      await expect(listTraces(dir)).resolves.toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws for a missing dir', async () => {
+    const dir = join(tmpdir(), `agentrec-storage-missing-${process.pid}`);
+    await expect(listTraces(dir)).rejects.toThrow();
+  });
+});
+
+describe('resolveRunDir', () => {
+  const original = process.env.AGENTREC_RUN_DIR;
+  afterEach(() => {
+    if (original === undefined) delete process.env.AGENTREC_RUN_DIR;
+    else process.env.AGENTREC_RUN_DIR = original;
+  });
+
+  it('prefers an explicit dir over the env var', () => {
+    process.env.AGENTREC_RUN_DIR = '/env/dir';
+    expect(resolveRunDir('/explicit/dir')).toBe('/explicit/dir');
+  });
+
+  it('falls back to the env var when no explicit dir is given', () => {
+    process.env.AGENTREC_RUN_DIR = '/env/dir';
+    expect(resolveRunDir()).toBe('/env/dir');
+  });
+
+  it('falls back to the default when the env var is empty', () => {
+    process.env.AGENTREC_RUN_DIR = '';
+    expect(resolveRunDir()).toBe(DEFAULT_RUN_DIR);
   });
 });
