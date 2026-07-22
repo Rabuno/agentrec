@@ -144,6 +144,8 @@ jobs:
         env:
           # Issue content is untrusted input — no write-scoped token reaches the CLI.
           GITHUB_TOKEN: ''
+          # Without this, the CLI refuses to run: "not running in a trusted directory".
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: 'gemini-3.1-flash-lite'
