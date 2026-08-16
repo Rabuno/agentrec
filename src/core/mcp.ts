@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 
 export interface McpJsonRpcMessage {
   jsonrpc?: string;
@@ -24,19 +25,23 @@ function tryParseJson(text: string, onMessage: (message: McpJsonRpcMessage) => v
 }
 
 function parseContentLengthMessage(buffer: string): { body: string; remaining: string } | null {
-  const headerMatch = buffer.match(/Content-Length:\s*(\d+)/i);
-  if (!headerMatch) return null;
+  // Ensure the buffer starts with an HTTP-style header to prevent false matches in JSON bodies
+  if (!/^(content-length|content-type)/i.test(buffer.trimStart())) {
+    return null;
+  }
 
-  const contentLength = parseInt(headerMatch[1], 10);
-  const headerIndex = headerMatch.index!;
-  
-  const remainingFromHeader = buffer.slice(headerIndex);
-  const separatorMatch = remainingFromHeader.match(/\r?\n\r?\n/);
+  const separatorMatch = buffer.match(/\r?\n\r?\n/);
   if (!separatorMatch) return null;
 
   const separatorIndex = separatorMatch.index!;
   const separatorLength = separatorMatch[0].length;
-  const bodyStartIndex = headerIndex + separatorIndex + separatorLength;
+  const headerBlock = buffer.slice(0, separatorIndex);
+
+  const contentLengthMatch = headerBlock.match(/Content-Length:\s*(\d+)/i);
+  if (!contentLengthMatch) return null;
+
+  const contentLength = parseInt(contentLengthMatch[1], 10);
+  const bodyStartIndex = separatorIndex + separatorLength;
 
   if (buffer.length >= bodyStartIndex + contentLength) {
     const body = buffer.slice(bodyStartIndex, bodyStartIndex + contentLength);
@@ -52,9 +57,10 @@ export function createMcpInterceptor(
   onMessage: (message: McpJsonRpcMessage) => void
 ): void {
   let buffer = '';
+  const decoder = new StringDecoder('utf8');
 
   stream.on('data', (chunk: Buffer | string) => {
-    buffer += chunk.toString('utf8');
+    buffer += typeof chunk === 'string' ? chunk : decoder.write(chunk);
     
     let processing = true;
     while (processing) {
@@ -69,8 +75,9 @@ export function createMcpInterceptor(
         continue;
       }
       
-      // If we have "content-length:" partially in the buffer, wait for more data.
-      if (buffer.toLowerCase().includes('content-length:')) {
+      // If we have a partial Content-Length/Type header at the start of buffer, wait for more data.
+      const lowerBuf = buffer.trimStart().toLowerCase();
+      if (lowerBuf.startsWith('content-length') || lowerBuf.startsWith('content-type')) {
         break;
       }
       
@@ -89,6 +96,7 @@ export function createMcpInterceptor(
   });
 
   stream.on('end', () => {
+    buffer += decoder.end();
     const line = buffer.trim();
     if (line) {
       const parsed = parseContentLengthMessage(line);
