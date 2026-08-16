@@ -23,6 +23,30 @@ function tryParseJson(text: string, onMessage: (message: McpJsonRpcMessage) => v
   }
 }
 
+function parseContentLengthMessage(buffer: string): { body: string; remaining: string } | null {
+  const headerMatch = buffer.match(/Content-Length:\s*(\d+)/i);
+  if (!headerMatch) return null;
+
+  const contentLength = parseInt(headerMatch[1], 10);
+  const headerIndex = headerMatch.index!;
+  
+  const remainingFromHeader = buffer.slice(headerIndex);
+  const separatorMatch = remainingFromHeader.match(/\r?\n\r?\n/);
+  if (!separatorMatch) return null;
+
+  const separatorIndex = separatorMatch.index!;
+  const separatorLength = separatorMatch[0].length;
+  const bodyStartIndex = headerIndex + separatorIndex + separatorLength;
+
+  if (buffer.length >= bodyStartIndex + contentLength) {
+    const body = buffer.slice(bodyStartIndex, bodyStartIndex + contentLength);
+    const remaining = buffer.slice(bodyStartIndex + contentLength);
+    return { body, remaining };
+  }
+
+  return null;
+}
+
 export function createMcpInterceptor(
   stream: Readable,
   onMessage: (message: McpJsonRpcMessage) => void
@@ -36,23 +60,17 @@ export function createMcpInterceptor(
     while (processing) {
       processing = false;
       
-      // 1. Try parsing Content-Length framing (LSP / SSE / standard header format)
-      const headerMatch = buffer.match(/^Content-Length:\s*(\d+)\r?\n\r?\n/i);
-      if (headerMatch) {
-        const contentLength = parseInt(headerMatch[1], 10);
-        const headerLength = headerMatch[0].length;
-        
-        if (buffer.length >= headerLength + contentLength) {
-          const body = buffer.slice(headerLength, headerLength + contentLength);
-          buffer = buffer.slice(headerLength + contentLength);
-          tryParseJson(body, onMessage);
-          processing = true;
-          continue;
-        }
+      // 1. Try parsing Content-Length framing
+      const parsed = parseContentLengthMessage(buffer);
+      if (parsed) {
+        buffer = parsed.remaining;
+        tryParseJson(parsed.body, onMessage);
+        processing = true;
+        continue;
       }
       
-      // If we see a partial Content-Length header at the start of buffer, wait for more data.
-      if (buffer.toLowerCase().startsWith('content-length:')) {
+      // If we have "content-length:" partially in the buffer, wait for more data.
+      if (buffer.toLowerCase().includes('content-length:')) {
         break;
       }
       
@@ -73,12 +91,9 @@ export function createMcpInterceptor(
   stream.on('end', () => {
     const line = buffer.trim();
     if (line) {
-      const headerMatch = line.match(/^Content-Length:\s*(\d+)\r?\n\r?\n/i);
-      if (headerMatch) {
-        const contentLength = parseInt(headerMatch[1], 10);
-        const headerLength = headerMatch[0].length;
-        const body = line.slice(headerLength, headerLength + contentLength);
-        tryParseJson(body, onMessage);
+      const parsed = parseContentLengthMessage(line);
+      if (parsed) {
+        tryParseJson(parsed.body, onMessage);
       } else {
         tryParseJson(line, onMessage);
       }

@@ -342,23 +342,7 @@ program
     if (!command) throw new Error('Usage: agentrec mcp -- <command>');
 
     const dir = resolveRunDir(options.dir);
-
-    // Load redaction configuration from .agentrec/config.json if it exists
-    let redactionConfig: any = undefined;
-    try {
-      const configContent = await readFile('.agentrec/config.json', 'utf8');
-      const config = JSON.parse(configContent);
-      if (config.redaction !== undefined) {
-        redactionConfig = config.redaction;
-      }
-    } catch {
-      // Config file doesn't exist or is invalid, ignore
-    }
-
-    const recorder = createRecorder({
-      runDir: dir,
-      redaction: redactionConfig,
-    });
+    const recorder = createRecorder({ runDir: dir });
     recorder.startRun({ command: cmd.join(' ') });
 
     const pendingCalls = new Map<string | number, string>();
@@ -398,6 +382,8 @@ program
           pendingCalls.delete(msg.id);
           if (msg.result !== undefined) {
             recorder.recordToolResult(name, msg.result as Record<string, unknown> | undefined);
+          } else if (msg.error !== undefined) {
+            recorder.recordToolResult(name, { error: msg.error } as Record<string, unknown>);
           }
         }
       }
@@ -412,6 +398,7 @@ program
       process.exitCode = 1;
     }
   });
+
 
 
 

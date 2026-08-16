@@ -35,6 +35,24 @@ describe('MCP JSON-RPC Stream Interceptor', () => {
     });
   });
 
+  it('correctly parses Content-Length framed JSON messages with other headers', async () => {
+    const stream = Readable.from([
+      'Content-Type: application/vscode-jsonrpc; charset=utf-8\r\nContent-Length: 46\r\n\r\n{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    ]);
+    const onMessage = vi.fn();
+    
+    createMcpInterceptor(stream, onMessage);
+    await new Promise((resolve) => stream.on('end', resolve));
+    
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(onMessage).toHaveBeenCalledWith({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    });
+  });
+
+
   it('handles messages split across multiple chunks (fragmented)', async () => {
     const stream = Readable.from([
       '{"jsonrpc":"2.0"',
