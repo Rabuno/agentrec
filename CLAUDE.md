@@ -46,32 +46,36 @@ If a change touches user-facing behavior, update README or examples.
 - Do not merge PRs automatically.
 - Never commit secrets, API keys, tokens, or generated private traces.
 
-## Product Roadmap Priority
+## Product Roadmap Priority (10k Stars Strategic Roadmap)
 
-Prioritize removing adoption-blocking friction over adding deeper features. (Reordered 2026-07-12 after oryna review: manual-instrumentation-only recording was the actual adoption blocker, not missing baseline/report features. Adapters — transparent recording — and proof-it-works demo assets move ahead of everything else.)
+Prioritize removing adoption-blocking friction over adding deeper features, expanding language ecosystem coverage, and enhancing local visualization.
 
 1. `agentrec latest` (in flight, finish it)
 2. Vercel AI SDK adapter — transparent instrumentation, no manual `recordToolCall` calls required
 3. OpenAI SDK adapter — same reasoning
-4. README screenshots/GIF/docs polish — demo assets ship right after there's something frictionless to demo
-5. Golden trace baselines
-6. `agentrec baseline create/update/list`
-7. Better local trace viewer / report UI
-8. `agentrec diff --json`
-9. GitHub Action
-10. PR comment reporter
-11. More examples with mock mode
+4. MCP Stdio/SSE Proxy (`agentrec mcp -- <server-cmd>`) — zero-code recording for Claude Desktop, Cursor, and MCP servers
+5. README screenshots/GIF/docs polish — demo assets (including MCP proxy recordings) ship right after there's something frictionless to demo
+6. Golden trace baselines
+7. `agentrec baseline create/update/list`
+8. Better local trace viewer / report UI
+9. `agentrec diff --json`
+10. GitHub Action
+11. PR comment reporter
+12. More examples with mock mode (including MCP proxy examples)
+13. Python SDK (`python/agentrec`) with OpenAI Python SDK and LiteLLM adapters
+14. Dynamic Web Viewer Server (`agentrec show --web`) using local Vite/Next dev server
+15. Interactive Trace Playback Player (local interactive stepping)
 
-Cut/deferred indefinitely: `agentrec test` YAML config — this is promptfoo's home turf (23k stars, YAML-driven eval config already dominant there); competing head-on there is the worst available fight. The regression-test-runner positioning still holds via baselines + `diff`; only the YAML convenience layer on top is cut. Revisit only if adapters + demo actually drive real (non-author) trace volume.
 
 Scope weighting target:
 
-- 40% user-facing features
+- 40% user-facing features (TS + Python SDKs)
 - 25% adapters/examples
-- 20% docs/README/demo polish
+- 20% docs/README/web player polish
 - 15% internal quality/testing
 
-Success bar: honest target is ~1k stars + real non-author usage in 12 months, not 10k. Re-evaluate after adapters + demo GIF + one launch post: if npm downloads spike then flatten and every issue is self-filed, stop investing in growth.
+Success bar: Target 10k stars by establishing agentrec as the go-to multi-language local-first regression testing layer for AI agents.
+
 
 ## Daily PR Value Threshold
 
