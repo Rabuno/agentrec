@@ -1,5 +1,7 @@
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
+import type { AgentRecorder } from './recorder.js';
 
 export interface McpJsonRpcMessage {
   jsonrpc?: string;
@@ -51,7 +53,6 @@ function parseContentLengthMessage(buffer: string): { body: string; remaining: s
 
   return null;
 }
-
 export function createMcpInterceptor(
   stream: Readable,
   onMessage: (message: McpJsonRpcMessage) => void
@@ -108,3 +109,53 @@ export function createMcpInterceptor(
     }
   });
 }
+
+export class McpProxy {
+  private pendingCalls = new Map<string | number, string>();
+
+  constructor(
+    private recorder: AgentRecorder,
+    private clientStdin: Readable,
+    private clientStdout: Writable,
+    private serverStdin: Writable,
+    private serverStdout: Readable
+  ) {}
+
+  start(): void {
+    const stdinInterceptorStream = new PassThrough();
+    const stdoutInterceptorStream = new PassThrough();
+
+    this.clientStdin.pipe(stdinInterceptorStream);
+    this.clientStdin.pipe(this.serverStdin);
+
+    this.serverStdout.pipe(stdoutInterceptorStream);
+    this.serverStdout.pipe(this.clientStdout);
+
+    createMcpInterceptor(stdinInterceptorStream, (msg) => {
+      if (msg && msg.method === 'tools/call') {
+        const id = msg.id;
+        const name = msg.params?.name;
+        const toolArgs = msg.params?.arguments;
+        if (id !== undefined && name) {
+          this.pendingCalls.set(id, name);
+          this.recorder.recordToolCall(name, toolArgs as Record<string, unknown> | undefined);
+        }
+      }
+    });
+
+    createMcpInterceptor(stdoutInterceptorStream, (msg) => {
+      if (msg && msg.id !== undefined) {
+        const name = this.pendingCalls.get(msg.id);
+        if (name) {
+          this.pendingCalls.delete(msg.id);
+          if (msg.result !== undefined) {
+            this.recorder.recordToolResult(name, msg.result as Record<string, unknown> | undefined);
+          } else if (msg.error !== undefined) {
+            this.recorder.recordToolResult(name, { error: msg.error } as Record<string, unknown>);
+          }
+        }
+      }
+    });
+  }
+}
+

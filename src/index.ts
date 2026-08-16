@@ -9,5 +9,5 @@ export type { DiffOptions, TraceDiff } from './diff.js';
 export { ReplayStore } from './replay.js';
 export { renderTraceReport, writeTraceReport, defaultReportPath } from './report.js';
 export type { ReportOptions } from './report.js';
-export { createMcpInterceptor } from './core/mcp.js';
+export { createMcpInterceptor, McpProxy } from './core/mcp.js';
 

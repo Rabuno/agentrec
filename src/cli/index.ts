@@ -19,9 +19,8 @@ import {
 import type { AgentTrace } from '../core/types.js';
 import { diffTraces } from '../diff.js';
 import { writeTraceReport } from '../report.js';
-import { PassThrough } from 'node:stream';
 import { createRecorder } from '../core/recorder.js';
-import { createMcpInterceptor } from '../core/mcp.js';
+import { McpProxy } from '../core/mcp.js';
 
 
 const program = new Command();
@@ -345,49 +344,18 @@ program
     const recorder = createRecorder({ runDir: dir });
     recorder.startRun({ command: cmd.join(' ') });
 
-    const pendingCalls = new Map<string | number, string>();
-
     const child = execa(command, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
     });
 
-    const stdinInterceptorStream = new PassThrough();
-    const stdoutInterceptorStream = new PassThrough();
-
-    // Pipe stdin from parent process to child's stdin
-    process.stdin.pipe(stdinInterceptorStream);
-    process.stdin.pipe(child.stdin!);
-
-    // Pipe child's stdout to parent's stdout
-    child.stdout!.pipe(stdoutInterceptorStream);
-    child.stdout!.pipe(process.stdout);
-
-    // Setup interceptors
-    createMcpInterceptor(stdinInterceptorStream, (msg) => {
-      if (msg && msg.method === 'tools/call') {
-        const id = msg.id;
-        const name = msg.params?.name;
-        const toolArgs = msg.params?.arguments;
-        if (id !== undefined && name) {
-          pendingCalls.set(id, name);
-          recorder.recordToolCall(name, toolArgs as Record<string, unknown> | undefined);
-        }
-      }
-    });
-
-    createMcpInterceptor(stdoutInterceptorStream, (msg) => {
-      if (msg && msg.id !== undefined) {
-        const name = pendingCalls.get(msg.id);
-        if (name) {
-          pendingCalls.delete(msg.id);
-          if (msg.result !== undefined) {
-            recorder.recordToolResult(name, msg.result as Record<string, unknown> | undefined);
-          } else if (msg.error !== undefined) {
-            recorder.recordToolResult(name, { error: msg.error } as Record<string, unknown>);
-          }
-        }
-      }
-    });
+    const proxy = new McpProxy(
+      recorder,
+      process.stdin,
+      process.stdout,
+      child.stdin!,
+      child.stdout!
+    );
+    proxy.start();
 
     try {
       const result = await child;
@@ -398,10 +366,6 @@ program
       process.exitCode = 1;
     }
   });
-
-
-
-
 try {
   await program.parseAsync(process.argv);
 } catch (error) {
