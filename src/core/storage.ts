@@ -67,13 +67,21 @@ export async function latestTracePath(runDir = resolveRunDir()) {
 
   // Incremental persistence can leave a trace file mid-run (status: 'running') on disk;
   // skip those and return the newest run that actually finished.
+  let hasUnreadable = false;
+  let hasRunning = false;
+
   for (const { path } of files) {
     try {
       const trace = await readTrace(path);
       if (trace.status !== 'running') return path;
+      hasRunning = true;
     } catch {
-      // Skip corrupt or unreadable traces (e.g. invalid JSON, schema validation failure)
+      hasUnreadable = true;
     }
+  }
+
+  if (hasUnreadable && !hasRunning) {
+    throw new Error(`No completed trace found in ${runDir}; all trace files are corrupt or unreadable.`);
   }
 
   throw new Error(`No completed trace found in ${runDir}; the latest run may still be in progress or crashed before finishing.`);
