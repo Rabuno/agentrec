@@ -1,4 +1,5 @@
 import type { AgentTrace } from './types.js';
+import { isPlainObject, matchesPath } from './pathMatch.js';
 
 export const DEFAULT_REDACTION_REPLACEMENT = '[REDACTED]';
 
@@ -83,28 +84,11 @@ function matchesRule(rule: RedactionRule, key: string, path: string[]) {
 
 function matches(matcher: string | RegExp | undefined, value: string) {
   if (!matcher) return false;
-  if (typeof matcher === 'string') return matcher.includes('.') ? matchesPath(value, matcher) : matcher.toLowerCase() === value.toLowerCase();
+  if (typeof matcher === 'string') return matcher.includes('.') ? matchesPath(value, matcher, { caseInsensitive: true }) : matcher.toLowerCase() === value.toLowerCase();
   matcher.lastIndex = 0;
   return matcher.test(value);
 }
 
-function matchesPath(value: string, pattern: string) {
-  const regex = new RegExp(`^${pattern.split('.').map(pathSegmentToRegex).join('\\.')}$`, 'i');
-  return regex.test(value);
-}
-
-function pathSegmentToRegex(segment: string) {
-  return segment === '*' ? '[^.]+' : escapeRegex(segment);
-}
-
 function pathToString(path: string[]) {
   return path.join('.');
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
 }

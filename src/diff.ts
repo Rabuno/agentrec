@@ -1,4 +1,5 @@
 import type { AgentTrace } from './core/types.js';
+import { isPlainObject, matchesPath } from './core/pathMatch.js';
 
 export type TraceDiff = {
   equal: boolean;
@@ -104,17 +105,6 @@ function stripIgnored(value: unknown, ignorePaths: string[], path: string[] = []
   return value;
 }
 
-function matchesPath(path: string, patterns: string[]) {
-  return patterns.some((pattern) => {
-    const regex = new RegExp(`^${pattern.split('.').map(pathSegmentToRegex).join('\\.')}$`);
-    return regex.test(path);
-  });
-}
-
-function pathSegmentToRegex(segment: string) {
-  return segment === '*' ? '[^.]+' : escapeRegex(segment);
-}
-
 function deepEqual(left: unknown, right: unknown) {
   return stableStringify(left) === stableStringify(right);
 }
@@ -129,14 +119,6 @@ function sortKeys(value: unknown): unknown {
     return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortKeys(value[key])]));
   }
   return value;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
 }
 
 function unique(values: string[]) {

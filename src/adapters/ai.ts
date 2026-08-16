@@ -1,5 +1,6 @@
 import type { LanguageModelMiddleware } from 'ai';
 import type { AgentRecorder } from '../core/recorder.js';
+import { createRecordingHelpers } from './shared.js';
 
 type ToolResultPart = { type: 'tool-result'; toolCallId: string; toolName: string; output: { type: string; value: unknown } };
 type PromptMessage = { content?: unknown };
@@ -21,29 +22,7 @@ type GenerateResultLike = {
  */
 export function agentrecMiddleware(recorder: AgentRecorder): LanguageModelMiddleware {
   const seenToolResultIds = new Set<string>();
-  const warned = new Set<string>();
-
-  function warnOnce(key: string, message: string) {
-    if (warned.has(key)) return;
-    warned.add(key);
-    console.warn(`[agentrec] ${message}`);
-  }
-
-  function isRecording(): boolean {
-    try {
-      return recorder.currentTrace().status === 'running';
-    } catch {
-      return false;
-    }
-  }
-
-  function safeRecord(fn: () => void) {
-    try {
-      fn();
-    } catch (error) {
-      warnOnce('record-failure', `failed to record a trace event — ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
+  const { warnOnce, isRecording, safeRecord, recordStreamResponse } = createRecordingHelpers(recorder);
 
   // Tool results never come back to a model-level middleware directly; they reappear
   // as `tool-result` parts in the *next* step's prompt. Reconstruct them from there.
@@ -77,16 +56,6 @@ export function agentrecMiddleware(recorder: AgentRecorder): LanguageModelMiddle
         durationMs: Date.now() - startedAt,
       });
       for (const call of toolCalls) recorder.recordToolCall(call.toolName, { toolCallId: call.toolCallId, input: call.input });
-    });
-  }
-
-  function recordStreamResponse(
-    model: { provider: string; modelId: string },
-    data: { text: string; toolCalls: ToolCallInfo[]; finishReason?: string; usage?: { inputTokens?: number; outputTokens?: number }; durationMs: number },
-  ) {
-    safeRecord(() => {
-      recorder.recordLlmResponse({ provider: model.provider, modelId: model.modelId, text: data.text, finishReason: data.finishReason, usage: data.usage, durationMs: data.durationMs });
-      for (const call of data.toolCalls) recorder.recordToolCall(call.toolName, { toolCallId: call.toolCallId, input: call.input });
     });
   }
 

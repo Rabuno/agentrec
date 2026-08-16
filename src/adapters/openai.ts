@@ -1,4 +1,5 @@
 import type { AgentRecorder } from '../core/recorder.js';
+import { createRecordingHelpers } from './shared.js';
 
 type ToolCallInfo = { toolCallId: string; toolName: string; input: string };
 type ChatMessage = {
@@ -35,29 +36,7 @@ type OpenAIClientLike = {
  */
 export function wrapOpenAI<T extends OpenAIClientLike>(client: T, recorder: AgentRecorder): T {
   const seenToolResultIds = new Set<string>();
-  const warned = new Set<string>();
-
-  function warnOnce(key: string, message: string) {
-    if (warned.has(key)) return;
-    warned.add(key);
-    console.warn(`[agentrec] ${message}`);
-  }
-
-  function isRecording(): boolean {
-    try {
-      return recorder.currentTrace().status === 'running';
-    } catch {
-      return false;
-    }
-  }
-
-  function safeRecord(fn: () => void) {
-    try {
-      fn();
-    } catch (error) {
-      warnOnce('record-failure', `failed to record a trace event — ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
+  const { warnOnce, isRecording, safeRecord, recordStreamResponse } = createRecordingHelpers(recorder);
 
   // Tool results only reappear on the NEXT request as {role:'tool', tool_call_id, content} —
   // that message has no tool name, but the preceding assistant tool-call message (resent as
@@ -110,16 +89,6 @@ export function wrapOpenAI<T extends OpenAIClientLike>(client: T, recorder: Agen
       for (const call of extractFunctionToolCalls(message.tool_calls)) {
         recorder.recordToolCall(call.toolName, { toolCallId: call.toolCallId, input: call.input });
       }
-    });
-  }
-
-  function recordStreamResponse(
-    model: string | undefined,
-    data: { text: string; toolCalls: ToolCallInfo[]; finishReason?: string; usage?: { inputTokens?: number; outputTokens?: number }; durationMs: number },
-  ) {
-    safeRecord(() => {
-      recorder.recordLlmResponse({ provider: 'openai', model, text: data.text, finishReason: data.finishReason, usage: data.usage, durationMs: data.durationMs });
-      for (const call of data.toolCalls) recorder.recordToolCall(call.toolName, { toolCallId: call.toolCallId, input: call.input });
     });
   }
 
