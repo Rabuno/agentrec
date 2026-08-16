@@ -7,7 +7,24 @@ describe('MCP JSON-RPC Stream Interceptor', () => {
     const stream = Readable.from(['{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n']);
     const onMessage = vi.fn();
     
-    const interceptor = createMcpInterceptor(stream, onMessage);
+    createMcpInterceptor(stream, onMessage);
+    await new Promise((resolve) => stream.on('end', resolve));
+    
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(onMessage).toHaveBeenCalledWith({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    });
+  });
+
+  it('correctly parses Content-Length framed JSON messages', async () => {
+    const stream = Readable.from([
+      'Content-Length: 46\r\n\r\n{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    ]);
+    const onMessage = vi.fn();
+    
+    createMcpInterceptor(stream, onMessage);
     await new Promise((resolve) => stream.on('end', resolve));
     
     expect(onMessage).toHaveBeenCalledTimes(1);

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Command } from 'commander';
@@ -342,7 +342,23 @@ program
     if (!command) throw new Error('Usage: agentrec mcp -- <command>');
 
     const dir = resolveRunDir(options.dir);
-    const recorder = createRecorder({ runDir: dir });
+
+    // Load redaction configuration from .agentrec/config.json if it exists
+    let redactionConfig: any = undefined;
+    try {
+      const configContent = await readFile('.agentrec/config.json', 'utf8');
+      const config = JSON.parse(configContent);
+      if (config.redaction !== undefined) {
+        redactionConfig = config.redaction;
+      }
+    } catch {
+      // Config file doesn't exist or is invalid, ignore
+    }
+
+    const recorder = createRecorder({
+      runDir: dir,
+      redaction: redactionConfig,
+    });
     recorder.startRun({ command: cmd.join(' ') });
 
     const pendingCalls = new Map<string | number, string>();
@@ -367,10 +383,10 @@ program
       if (msg && msg.method === 'tools/call') {
         const id = msg.id;
         const name = msg.params?.name;
-        const args = msg.params?.arguments;
+        const toolArgs = msg.params?.arguments;
         if (id !== undefined && name) {
           pendingCalls.set(id, name);
-          recorder.recordToolCall(name, { id, arguments: args });
+          recorder.recordToolCall(name, toolArgs as Record<string, unknown> | undefined);
         }
       }
     });
@@ -380,10 +396,8 @@ program
         const name = pendingCalls.get(msg.id);
         if (name) {
           pendingCalls.delete(msg.id);
-          if (msg.error) {
-            recorder.recordToolResult(name, { id: msg.id, error: msg.error });
-          } else {
-            recorder.recordToolResult(name, { id: msg.id, result: msg.result });
+          if (msg.result !== undefined) {
+            recorder.recordToolResult(name, msg.result as Record<string, unknown> | undefined);
           }
         }
       }
@@ -398,6 +412,7 @@ program
       process.exitCode = 1;
     }
   });
+
 
 
 try {

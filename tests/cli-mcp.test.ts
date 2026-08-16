@@ -80,17 +80,11 @@ describe('CLI mcp command', () => {
 
     expect(toolCall).toBeDefined();
     expect(toolCall?.name).toBe('calculate_sum');
-    expect(toolCall?.data).toEqual({
-      id: 'request-123',
-      arguments: { a: 5, b: 10 }
-    });
+    expect(toolCall?.data).toEqual({ a: 5, b: 10 });
 
     expect(toolResult).toBeDefined();
     expect(toolResult?.name).toBe('calculate_sum');
-    expect(toolResult?.data).toEqual({
-      id: 'request-123',
-      result: { sum: 15 }
-    });
+    expect(toolResult?.data).toEqual({ sum: 15 });
 
     await rm(dir, { recursive: true, force: true });
   }, 30000);
