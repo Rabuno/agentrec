@@ -19,6 +19,10 @@ import {
 import type { AgentTrace } from '../core/types.js';
 import { diffTraces } from '../diff.js';
 import { writeTraceReport } from '../report.js';
+import { PassThrough } from 'node:stream';
+import { createRecorder } from '../core/recorder.js';
+import { createMcpInterceptor } from '../core/mcp.js';
+
 
 const program = new Command();
 
@@ -326,6 +330,75 @@ program
       await rm(runDir, { recursive: true, force: true });
     }
   });
+
+program
+  .command('mcp')
+  .allowUnknownOption(true)
+  .argument('[cmd...]')
+  .description('Run MCP server process and proxy Stdio JSON-RPC traffic to record trace')
+  .option('-d, --dir <dir>', 'Trace directory (default: .agentrec/runs)')
+  .action(async (cmd: string[], options: { dir?: string }) => {
+    const [command, ...args] = cmd;
+    if (!command) throw new Error('Usage: agentrec mcp -- <command>');
+
+    const dir = resolveRunDir(options.dir);
+    const recorder = createRecorder({ runDir: dir });
+    recorder.startRun({ command: cmd.join(' ') });
+
+    const pendingCalls = new Map<string | number, string>();
+
+    const child = execa(command, args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+    });
+
+    const stdinInterceptorStream = new PassThrough();
+    const stdoutInterceptorStream = new PassThrough();
+
+    // Pipe stdin from parent process to child's stdin
+    process.stdin.pipe(stdinInterceptorStream);
+    process.stdin.pipe(child.stdin!);
+
+    // Pipe child's stdout to parent's stdout
+    child.stdout!.pipe(stdoutInterceptorStream);
+    child.stdout!.pipe(process.stdout);
+
+    // Setup interceptors
+    createMcpInterceptor(stdinInterceptorStream, (msg) => {
+      if (msg && msg.method === 'tools/call') {
+        const id = msg.id;
+        const name = msg.params?.name;
+        const args = msg.params?.arguments;
+        if (id !== undefined && name) {
+          pendingCalls.set(id, name);
+          recorder.recordToolCall(name, { id, arguments: args });
+        }
+      }
+    });
+
+    createMcpInterceptor(stdoutInterceptorStream, (msg) => {
+      if (msg && msg.id !== undefined) {
+        const name = pendingCalls.get(msg.id);
+        if (name) {
+          pendingCalls.delete(msg.id);
+          if (msg.error) {
+            recorder.recordToolResult(name, { id: msg.id, error: msg.error });
+          } else {
+            recorder.recordToolResult(name, { id: msg.id, result: msg.result });
+          }
+        }
+      }
+    });
+
+    try {
+      const result = await child;
+      await recorder.finishRun({ exitCode: result.exitCode });
+    } catch (error) {
+      await recorder.failRun(error);
+      console.error(`MCP server failed: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  });
+
 
 try {
   await program.parseAsync(process.argv);
