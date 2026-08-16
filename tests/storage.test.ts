@@ -43,6 +43,30 @@ describe('latestTracePath', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('skips a corrupt trace file and returns the newest valid completed one', async () => {
+    const dir = await tempDir();
+    try {
+      await saveTrace(makeTrace({ runId: 'run_older', status: 'completed' }), dir);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await writeFile(join(dir, 'run_corrupt.json'), 'not json at all!', 'utf8');
+
+      const path = await latestTracePath(dir);
+      expect(path).toBe(join(dir, 'run_older.json'));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws a clear error when every trace on disk is corrupt', async () => {
+    const dir = await tempDir();
+    try {
+      await writeFile(join(dir, 'run_corrupt.json'), 'invalid json', 'utf8');
+      await expect(latestTracePath(dir)).rejects.toThrow('No completed trace found');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('listTraces', () => {
