@@ -1,6 +1,9 @@
 {
-  "name": "agentrec",
+  "name": "@rabuno/agentrec",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Black box recorder for AI agents. Trace, replay, and regression-test every agent run before production.",
   "type": "module",
   "bin": {
