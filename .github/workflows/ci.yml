@@ -101,5 +101,5 @@ jobs:
           mkdir -p /tmp/agentrec-package-smoke
           cd /tmp/agentrec-package-smoke
           npm init -y >/dev/null
-          npm install /tmp/agentrec-*.tgz >/dev/null
+          npm install /tmp/rabuno-agentrec-*.tgz >/dev/null
           npx agentrec --help
