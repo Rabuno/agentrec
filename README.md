@@ -1,6 +1,6 @@
 # agentrec
 
-[![npm version](https://img.shields.io/npm/v/agentrec?style=flat-square)](https://www.npmjs.com/package/agentrec)
+[![npm version](https://img.shields.io/npm/v/@rabuno/agentrec?style=flat-square)](https://www.npmjs.com/package/@rabuno/agentrec)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Rabuno/agentrec/ci.yml?style=flat-square)](https://github.com/Rabuno/agentrec/actions)
 [![CodeQL](https://github.com/Rabuno/agentrec/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Rabuno/agentrec/security/code-scanning)
@@ -40,8 +40,8 @@ Production AI agents are opaque. When an agent breaks in production, you need mo
 ### Try it in one command
 
 ```bash
-npx agentrec init
-npx agentrec record -- npx tsx -e "
+npx @rabuno/agentrec init
+npx @rabuno/agentrec record -- npx tsx -e "
   const {createRecorder} = require('agentrec');
   const r = createRecorder();
   r.startRun({q: 'hello'});
@@ -49,8 +49,8 @@ npx agentrec record -- npx tsx -e "
   r.recordToolResult('lookup', {value: 'world'});
   r.finishRun({answer: 'world'});
 "
-TRACE=$(npx agentrec latest)
-npx agentrec show "$TRACE"
+TRACE=$(npx @rabuno/agentrec latest)
+npx @rabuno/agentrec show "$TRACE"
 ```
 
 ### SDK usage
@@ -165,15 +165,15 @@ wrap once and call `recorder.startRun()`/`finishRun()` per run on that same reco
 npm ci && npm run build
 npm run example
 
-TRACE=$(npx agentrec latest)
-npx agentrec list
-npx agentrec show "$TRACE"
-npx agentrec report "$TRACE" --output /tmp/agentrec-demo.html
-npx agentrec diff "$TRACE" "$TRACE"   # should print "No regression detected"
+TRACE=$(npx @rabuno/agentrec latest)
+npx @rabuno/agentrec list
+npx @rabuno/agentrec show "$TRACE"
+npx @rabuno/agentrec report "$TRACE" --output /tmp/agentrec-demo.html
+npx @rabuno/agentrec diff "$TRACE" "$TRACE"   # should print "No regression detected"
 
-npx agentrec baseline create happy-path "$TRACE"
-npx agentrec baseline list
-npx agentrec test happy-path -- npm run example   # compares the next run against the baseline
+npx @rabuno/agentrec baseline create happy-path "$TRACE"
+npx @rabuno/agentrec baseline list
+npx @rabuno/agentrec test happy-path -- npm run example   # compares the next run against the baseline
 ```
 
 ![agentrec trace report header, summary metrics, and status badge](docs/images/report.gif)
