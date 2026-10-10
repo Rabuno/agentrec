@@ -31,7 +31,8 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "example": "tsx examples/basic-agent/agent.ts"
+    "example": "tsx examples/basic-agent/agent.ts",
+    "example:mcp": "tsx examples/mcp-proxy/agent.ts"
   },
   "keywords": [
     "ai-agents",

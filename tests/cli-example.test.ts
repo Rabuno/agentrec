@@ -1,3 +1,23 @@
 import { readFile, rm } from 'node:fs/promises'; import { join } from 'node:path'; import { tmpdir } from 'node:os'; import { execa } from 'execa'; import { describe, expect, it } from 'vitest';
 const quote=(value:string)=>`'${value.replaceAll("'","'\\''")}'`;
-describe('cli + example',()=>{ it('creates trace and renders timeline',async()=>{ await rm('.agentrec',{recursive:true,force:true}); await execa('node',['--import','tsx','examples/basic-agent/agent.ts']); const {stdout:files}=await execa('bash',['-lc','ls .agentrec/runs/*.json | tail -1']); const out=join(tmpdir(),`agentrec-show-${process.pid}.txt`); await execa('bash',['-lc',`node --import tsx src/cli/index.ts show ${quote(files.trim())} > ${quote(out)}`]); const stdout=await readFile(out,'utf8'); expect(stdout).toContain('Status: completed'); expect(stdout).toContain('basic-agent'); }, 15000); });
+describe('cli + example',()=>{
+  it('creates trace and renders timeline',async()=>{
+    await rm('.agentrec',{recursive:true,force:true});
+    await execa('node',['--import','tsx','examples/basic-agent/agent.ts']);
+    const {stdout:files}=await execa('bash',['-lc','ls .agentrec/runs/*.json | tail -1']);
+    const out=join(tmpdir(),`agentrec-show-${process.pid}.txt`);
+    await execa('bash',['-lc',`node --import tsx src/cli/index.ts show ${quote(files.trim())} > ${quote(out)}`]);
+    const stdout=await readFile(out,'utf8');
+    expect(stdout).toContain('Status: completed');
+    expect(stdout).toContain('basic-agent');
+  }, 15000);
+
+  it('runs mcp proxy example and records tool calls and results', async () => {
+    await rm('.agentrec', { recursive: true, force: true });
+    const { stdout } = await execa('node', ['--import', 'tsx', 'examples/mcp-proxy/agent.ts']);
+    expect(stdout).toContain('Recorded MCP Trace');
+    expect(stdout).toContain('[tool.call] calculator');
+    expect(stdout).toContain('[tool.result] calculator');
+    expect(stdout).toContain('Status: completed');
+  }, 20000);
+});
