@@ -28,11 +28,12 @@ Production AI agents are opaque. When an agent breaks in production, you need mo
 
 - **Record** — Capture prompts, tool calls, LLM responses, timings, and metadata as portable JSON traces.
 - **Replay** — Replay recorded outputs in original event order for deterministic testing and debugging.
-- **Diff** — Compare traces with stable object ordering, nested event-data checks, and volatile-field ignores.
+- **Diff** — Compare traces with stable object ordering, nested event-data checks, volatile-field ignores, and JSON output for CI.
 - **Report** — Generate self-contained HTML reports you can share or archive.
 - **Redaction** — Replace common secret keys and token-like strings before saving traces or reports.
 - **CLI & SDK** — Use the CLI for quick inspection, or the TypeScript SDK for programmatic recording.
 - **CI-ready** — `agentrec test` compares new traces to baselines with exit-code signaling and isolated run directories.
+- **MCP Proxy** — Intercept Stdio JSON-RPC traffic between MCP clients (Claude Desktop, Cursor) and MCP servers with zero code changes.
 - **Adapters** — transparent recording for the Vercel AI SDK and the OpenAI SDK: wrap once per run, no per-step record calls (see [Adapters](#adapters) below).
 
 ## Quickstart
@@ -142,18 +143,56 @@ wrap once and call `recorder.startRun()`/`finishRun()` per run on that same reco
 `AgentRecorder` supports being reused sequentially across runs. See
 [`examples/openai-adapter`](examples/openai-adapter) for a runnable, no-API-key example.
 
+### MCP Proxy — transparent recording for Claude Desktop and Cursor
+
+Record tool calls executed by Model Context Protocol (MCP) servers with **zero code modifications**. Wrap any MCP server command with `agentrec mcp -- <command>`:
+
+```bash
+# Intercept and record Stdio JSON-RPC traffic
+npx @rabuno/agentrec mcp -- python -m my_mcp_server
+```
+
+#### Claude Desktop setup (`claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "npx",
+      "args": ["@rabuno/agentrec", "mcp", "--", "node", "/path/to/server.js"]
+    }
+  }
+}
+```
+
+#### Cursor setup (`mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "npx",
+      "args": ["@rabuno/agentrec", "mcp", "--", "python", "-m", "my_mcp_server"]
+    }
+  }
+}
+```
+
+Every `tools/call` request and response is automatically captured into `.agentrec/runs/` while preserving stream transparency. See [`examples/mcp-proxy`](examples/mcp-proxy) for a runnable example.
+
 ### CLI commands
 
 | Command | Description |
 |---|---|
 | `agentrec init` | Create `.agentrec/` folders and config. |
 | `agentrec record -- <cmd>` | Run a command with agentrec env vars. |
+| `agentrec mcp -- <cmd>` | Run MCP server process and proxy Stdio JSON-RPC traffic to record trace. |
 | `agentrec show <trace>` | Render a trace timeline to stdout. |
 | `agentrec report <trace>` | Generate a self-contained HTML report with default redaction. |
 | `agentrec list` | List recent traces with status and timings. |
 | `agentrec latest` | Print the path of the newest finished trace (skips still-running runs). |
 | `agentrec replay <trace>` | Print recorded replay outputs. |
-| `agentrec diff <a> <b>` | Detect output/event/tool-call regressions. |
+| `agentrec diff <a> <b> [--json]` | Detect output/event/tool-call regressions (supports `--json`). |
 | `agentrec test <baseline> -- <cmd>` | Run command in an isolated trace dir and compare its trace to baseline. |
 | `agentrec baseline create <name> [trace]` | Save a trace (default: latest) as a named baseline. |
 | `agentrec baseline update <name> [trace]` | Update a baseline — prints the diff before overwriting. |
@@ -169,7 +208,8 @@ TRACE=$(npx @rabuno/agentrec latest)
 npx @rabuno/agentrec list
 npx @rabuno/agentrec show "$TRACE"
 npx @rabuno/agentrec report "$TRACE" --output /tmp/agentrec-demo.html
-npx @rabuno/agentrec diff "$TRACE" "$TRACE"   # should print "No regression detected"
+npx @rabuno/agentrec diff "$TRACE" "$TRACE"          # human-readable check
+npx @rabuno/agentrec diff "$TRACE" "$TRACE" --json   # JSON output for CI pipelines
 
 npx @rabuno/agentrec baseline create happy-path "$TRACE"
 npx @rabuno/agentrec baseline list
@@ -184,6 +224,9 @@ Open `/tmp/agentrec-demo.html` in your browser to see the full trace report.
 
 - **[Basic agent](examples/basic-agent/agent.ts)** — Search + LLM pattern with a fake provider (no API key needed).
 - **[OpenAI wrapper](examples/openai-wrapper/agent.ts)** — Wrap an OpenAI-style call with tracing (dry-run by default).
+- **[OpenAI adapter](examples/openai-adapter/agent.ts)** — Transparent recording with OpenAI SDK (`wrapOpenAI`).
+- **[Vercel AI SDK](examples/vercel-ai-sdk/agent.ts)** — Transparent recording with Vercel AI SDK (`agentrecMiddleware`).
+- **[MCP proxy](examples/mcp-proxy/agent.ts)** — Zero-code transparent recording for Model Context Protocol servers.
 - **[Multi-step agent](examples/multi-step-agent/agent.ts)** — A realistic multi-step agent with planning, tool calls, and structured output.
 
 ## Trace format

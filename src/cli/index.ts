@@ -185,8 +185,16 @@ program
 program
   .command('diff <a> <b>')
   .description('Diff two traces')
-  .action(async (a, b) => {
+  .option('--json', 'Output diff result as JSON')
+  .action(async (a, b, options: { json?: boolean }) => {
     const diff = diffTraces(await readTrace(a), await readTrace(b));
+    if (options.json) {
+      console.log(JSON.stringify(diff, null, 2));
+      if (!diff.equal) {
+        process.exitCode = 1;
+      }
+      return;
+    }
     if (diff.equal) {
       console.log(pc.green('No regression detected. Traces match.'));
     } else {

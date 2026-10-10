@@ -134,3 +134,19 @@ describe('resolveRunDir', () => {
     expect(resolveRunDir()).toBe(DEFAULT_RUN_DIR);
   });
 });
+
+describe('index exports', () => {
+  it('exports baseline and storage helpers from root index', async () => {
+    const index = await import('../src/index.js');
+    expect(typeof index.saveBaseline).toBe('function');
+    expect(typeof index.baselinePath).toBe('function');
+    expect(typeof index.listBaselineNames).toBe('function');
+    expect(typeof index.listTraces).toBe('function');
+    expect(typeof index.resolveRunDir).toBe('function');
+    expect(typeof index.latestTracePath).toBe('function');
+    expect(typeof index.createMcpInterceptor).toBe('function');
+    expect(typeof index.McpProxy).toBe('function');
+    expect(index.DEFAULT_BASELINE_DIR).toBe('.agentrec/baselines');
+    expect(index.DEFAULT_RUN_DIR).toBe('.agentrec/runs');
+  });
+});
